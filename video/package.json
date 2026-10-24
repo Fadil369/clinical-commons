@@ -1,0 +1,30 @@
+{
+  "name": "clinical-commons-video",
+  "private": true,
+  "description": "Bilingual (Arabic/English) short video on The Clinical Commons v1.2, made with Remotion.",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render ClinicalCommons out/the-clinical-commons.mp4",
+    "still": "remotion still ClinicalCommons out/still.png"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.534",
+    "@remotion/google-fonts": "4.0.534",
+    "@remotion/layout-utils": "4.0.534",
+    "@remotion/motion-blur": "4.0.534",
+    "@remotion/noise": "4.0.534",
+    "@remotion/paths": "4.0.534",
+    "@remotion/shapes": "4.0.534",
+    "@remotion/transitions": "4.0.534",
+    "lucide-react": "1.53.0",
+    "qrcode": "1.5.4",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "remotion": "4.0.534"
+  },
+  "devDependencies": {
+    "@types/qrcode": "1.5.6",
+    "@types/react": "19.3.0",
+    "typescript": "5.6.3"
+  }
+}

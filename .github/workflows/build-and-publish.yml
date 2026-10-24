@@ -1,0 +1,123 @@
+name: Build and publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'video/**'
+      - 'README.md'
+      - '.github/workflows/build-and-publish.yml'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish artifacts to the Hugging Face dataset'
+        type: boolean
+        default: true
+
+permissions:
+  id-token: write   # OIDC token for Hugging Face Trusted Publisher
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: video/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        working-directory: video
+        run: |
+          npm ci
+          python3 -m pip install --upgrade pip
+          python3 -m pip install numpy
+
+      - name: Ensure Chrome headless shell
+        working-directory: video
+        run: npx remotion browser ensure || true
+
+      - name: Build video and poster from source
+        working-directory: video
+        run: bash tools/build.sh
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: clinical-commons-media
+          path: |
+            video/out/the-clinical-commons.mp4
+            video/out/the-clinical-commons-poster.jpg
+          if-no-files-found: error
+
+      - name: Mint GitHub Actions OIDC token (audience=huggingface.co)
+        id: oidc
+        run: |
+          URL=$(python3 -c "import os,urllib.parse;p=urllib.parse.urlsplit(os.environ['ACTIONS_ID_TOKEN_REQUEST_URL']);q=[(k,v) for k,v in urllib.parse.parse_qsl(p.query) if k!='audience']+[('audience','https://huggingface.co')];print(urllib.parse.urlunsplit(p._replace(query=urllib.parse.urlencode(q))))")
+          TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$URL" | \
+            python3 -c "import json,sys;print(json.load(sys.stdin)['value'])")
+          echo "oidc_token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Exchange OIDC for a short-lived Hugging Face token
+        id: exchange
+        run: |
+          BODY=$(curl -s -X POST https://huggingface.co/oauth/token \
+            -H 'Content-Type: application/json' \
+            -d "{\"grant_type\":\"urn:ietf:params:oauth:grant-type:token-exchange\",\"subject_token_type\":\"urn:ietf:params:oauth:token-type:id_token\",\"subject_token\":\"${{ steps.oidc.outputs.oidc_token }}\",\"resource\":\"datasets/Fadil369/clinical-commons\"}")
+          echo "$BODY"
+          ACCESS_TOKEN=$(echo "$BODY" | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('access_token',''))" 2>/dev/null || echo "")
+          echo "hf_token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Publish to the Hugging Face dataset
+        if: inputs.publish != false
+        env:
+          # Preferred: the short-lived token minted through the Trusted Publisher.
+          # Fallback: the repo secret, used only until a trusted publisher is registered.
+          HF_TOKEN: ${{ steps.exchange.outputs.hf_token || secrets.HF_TOKEN }}
+          OIDC_OK: ${{ steps.exchange.outputs.hf_token != '' }}
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install huggingface_hub
+          python3 - <<'PY'
+          import os, sys
+          from huggingface_hub import HfApi
+          from huggingface_hub import CommitOperationAdd
+
+          tok = os.environ.get("HF_TOKEN", "").strip()
+          if not tok:
+              print("no HF token available; nothing published")
+              raise SystemExit(1)
+          if os.environ.get("OIDC_OK") == "true":
+              print("auth: OIDC trusted publisher")
+          else:
+              print("auth: repository secret fallback")
+
+          ops = [
+              CommitOperationAdd(path_in_repo="README.md",
+                                path_or_fileobj="README.md"),
+              CommitOperationAdd(path_in_repo="the-clinical-commons-poster.jpg",
+                                path_or_fileobj="video/out/the-clinical-commons-poster.jpg"),
+              CommitOperationAdd(path_in_repo="the-clinical-commons.mp4",
+                                path_or_fileobj="video/out/the-clinical-commons.mp4"),
+          ]
+          HfApi(token=tok).create_commit(
+              repo_id="Fadil369/clinical-commons",
+              repo_type="dataset",
+              operations=ops,
+              commit_message="[ci] Publish v2 video, poster and README from source",
+          )
+          print("DONE")
+          PY
+
+      - name: Summarise build
+        run: |
+          ls -l video/out/the-clinical-commons.mp4 video/out/the-clinical-commons-poster.jpg

@@ -19,6 +19,13 @@ Part of the [BPR community on Zenodo](https://zenodo.org/communities/bpr-doctors
 `the-clinical-commons.mp4`: an 88-second vertical summary in Arabic and English (1080×1920, made with Remotion),
 also at https://elfadil.brainsait.de/media/the-clinical-commons.mp4. Poster: `the-clinical-commons-poster.jpg`.
 
+## Source and build
+
+The video is built from source in this repository: `video/` holds the Remotion project, the
+deterministic ambient-soundtrack generator, and the audio-mixing script. The
+`Build and publish` workflow renders the video and poster on every change and publishes
+them here, so these files are reproducible rather than uploaded by hand.
+
 ## Files
 
 - `The_Clinical_Commons_EN_v1.2.pdf`: English version
