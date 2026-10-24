@@ -33,7 +33,7 @@ jobs:
             python3 -c "import json,sys;print(json.load(sys.stdin)['value'])")
           echo "oidc_token=$TOKEN" >> "$GITHUB_OUTPUT"
 
-      - name: Debug: decode OIDC JWT claims
+      - name: "Debug: decode OIDC JWT claims"
         run: |
           python3 - <<'PY'
           import json, base64, os
