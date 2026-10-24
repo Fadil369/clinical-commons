@@ -78,7 +78,7 @@ jobs:
           echo "hf_token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
 
       - name: Publish to the Hugging Face dataset
-        if: inputs.publish != false
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
         env:
           # Preferred: the short-lived token minted through the Trusted Publisher.
           # Fallback: the repo secret, used only until a trusted publisher is registered.
