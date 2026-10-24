@@ -1,0 +1,52 @@
+name: Publish to Hugging Face Dataset
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'README.md'
+      - 'the-clinical-commons-poster.jpg'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch/tag to publish'
+        default: 'main'
+
+permissions:
+  id-token: write   # OIDC token for Hugging Face Trusted Publisher
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get GitHub Actions OIDC token
+        id: oidc
+        run: |
+          TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL" | \
+            python3 -c "import json,sys;print(json.load(sys.stdin)['value'])")
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Publish files to Hugging Face dataset
+        env:
+          HF_TOKEN: ${{ steps.oidc.outputs.token }}
+        run: |
+          pip install --quiet huggingface_hub
+          python - <<'PY'
+          from huggingface_hub import HfApi
+          import os
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          for f in ["README.md", "the-clinical-commons-poster.jpg"]:
+              api.upload_file(
+                  path_or_fileobj=f,
+                  path_in_repo=f,
+                  repo_id="Fadil369/clinical-commons",
+                  repo_type="dataset",
+                  commit_message=f"[ci] Publish {f} via GitHub Actions OIDC",
+              )
+              print(f"uploaded {f}")
+          print("DONE")
+          PY
