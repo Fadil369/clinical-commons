@@ -50,11 +50,11 @@ jobs:
       - name: Exchange OIDC for short-lived HF token
         id: exchange
         run: |
-          RESP=$(curl -s -w "\nHTTP %{http_code}" -X POST https://huggingface.co/oauth/token \
+          BODY=$(curl -s -X POST https://huggingface.co/oauth/token \
             -H 'Content-Type: application/json' \
             -d "{\"grant_type\":\"urn:ietf:params:oauth:grant-type:token-exchange\",\"subject_token_type\":\"urn:ietf:params:oauth:token-type:id_token\",\"subject_token\":\"${{ steps.oidc.outputs.oidc_token }}\",\"resource\":\"datasets/Fadil369/clinical-commons\"}")
-          echo "$RESP" | tail -1
-          ACCESS_TOKEN=$(echo "$RESP" | tail -1 | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('access_token',''))")
+          echo "$BODY"
+          ACCESS_TOKEN=$(echo "$BODY" | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('access_token',''))" 2>/dev/null || echo "")
           echo "hf_token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
 
       - name: Publish files to Hugging Face dataset
